@@ -31,4 +31,8 @@ vs1003b_status_t vs1003b_read_register(uint8_t address, uint16_t *value);
 /* DREQ를 기다린 뒤 SCI 레지스터 하나에 16비트 값을 씁니다. */
 vs1003b_status_t vs1003b_write_register(uint8_t address, uint16_t value);
 
+/* VS1003B 내장 사인 테스트를 시작하거나 종료합니다. */
+vs1003b_status_t vs1003b_sine_test_start(void);
+vs1003b_status_t vs1003b_sine_test_stop(void);
+
 #endif /* VS1003B_H */

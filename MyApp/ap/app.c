@@ -8,6 +8,7 @@
 #define VS1003B_SCI_VOL_ADDRESS 0x0BU
 #define VS1003B_CLOCKF_3X 0x9800U
 #define VS1003B_TEST_VOLUME 0x4040U
+#define VS1003B_SINE_DURATION_MS 1000U
 
 static message_type_t last_message = MSG_NONE;
 
@@ -16,6 +17,9 @@ volatile vs1003b_status_t vs1003b_debug_status = VS1003B_STATUS_INVALID_ARGUMENT
 volatile uint16_t vs1003b_debug_mode = 0U;
 volatile uint16_t vs1003b_debug_clockf = 0U;
 volatile uint16_t vs1003b_debug_volume = 0U;
+volatile bool vs1003b_debug_sine_active = false;
+
+static uint32_t sine_started_at_ms = 0U;
 
 void app_init(SPI_HandleTypeDef *vs1003b_spi)
 {
@@ -77,12 +81,33 @@ void app_init(SPI_HandleTypeDef *vs1003b_spi)
 
 void app_process(void)
 {
-ㅁ    message_type_t message = button_get_message();
+    message_type_t message = button_get_message();
 
     if (message != MSG_NONE)
     {
         last_message = message;
         alert_show(message);
+
+        if ((message == MSG_STOP_REQUEST) &&
+            (vs1003b_debug_status == VS1003B_STATUS_OK) &&
+            !vs1003b_debug_sine_active)
+        {
+            vs1003b_debug_status = vs1003b_sine_test_start();
+
+            if (vs1003b_debug_status == VS1003B_STATUS_OK)
+            {
+                sine_started_at_ms = HAL_GetTick();
+                vs1003b_debug_sine_active = true;
+            }
+        }
+    }
+
+    if (vs1003b_debug_sine_active &&
+        ((uint32_t)(HAL_GetTick() - sine_started_at_ms) >=
+         VS1003B_SINE_DURATION_MS))
+    {
+        vs1003b_debug_status = vs1003b_sine_test_stop();
+        vs1003b_debug_sine_active = false;
     }
 }
 

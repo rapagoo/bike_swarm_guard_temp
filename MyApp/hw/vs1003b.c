@@ -9,12 +9,21 @@
 #define VS1003B_SCI_WRITE_OPCODE 0x02U
 #define VS1003B_SCI_MODE_ADDRESS 0x00U
 #define VS1003B_SCI_MODE_RESET_VALUE 0x0800U
+#define VS1003B_SM_TESTS 0x0020U
 
 #define VS1003B_RESET_LOW_MS 2U
 #define VS1003B_DREQ_TIMEOUT_MS 100U
 #define VS1003B_SPI_TIMEOUT_MS 10U
 
 static SPI_HandleTypeDef *vs1003b_spi = NULL;
+
+static const uint8_t vs1003b_sine_start_command[8] = {
+    0x53U, 0xEFU, 0x6EU, 0x03U, 0x00U, 0x00U, 0x00U, 0x00U,
+};
+
+static const uint8_t vs1003b_sine_stop_command[8] = {
+    0x45U, 0x78U, 0x69U, 0x74U, 0x00U, 0x00U, 0x00U, 0x00U,
+};
 
 bool vs1003b_is_ready(void)
 {
@@ -26,7 +35,7 @@ static bool vs1003b_wait_ready(uint32_t timeout_ms)
     uint32_t started_at_ms = HAL_GetTick();
 
     while (!vs1003b_is_ready())
-    {
+    {                                               
         if ((uint32_t)(HAL_GetTick() - started_at_ms) >= timeout_ms)
         {
             return false;
@@ -135,6 +144,79 @@ vs1003b_status_t vs1003b_write_register(uint8_t address, uint16_t value)
     }
 
     return VS1003B_STATUS_OK;
+}
+
+static vs1003b_status_t vs1003b_send_sdi(const uint8_t *data, uint16_t size)
+{
+    uint8_t rx_data[sizeof(vs1003b_sine_start_command)] = {0U};
+
+    if ((vs1003b_spi == NULL) || (data == NULL) ||
+        (size == 0U) || (size > sizeof(rx_data)))
+    {
+        return VS1003B_STATUS_INVALID_ARGUMENT;
+    }
+
+    if (!vs1003b_wait_ready(VS1003B_DREQ_TIMEOUT_MS))
+    {
+        return VS1003B_STATUS_DREQ_TIMEOUT;
+    }
+
+    HAL_GPIO_WritePin(VS_XCS_GPIO_Port, VS_XCS_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(VS_XDCS_GPIO_Port, VS_XDCS_Pin, GPIO_PIN_RESET);
+
+    HAL_StatusTypeDef hal_status = HAL_SPI_TransmitReceive(
+        vs1003b_spi,
+        (uint8_t *)data,
+        rx_data,
+        size,
+        VS1003B_SPI_TIMEOUT_MS
+    );
+
+    HAL_GPIO_WritePin(VS_XDCS_GPIO_Port, VS_XDCS_Pin, GPIO_PIN_SET);
+
+    if (hal_status != HAL_OK)
+    {
+        return VS1003B_STATUS_SPI_ERROR;
+    }
+
+    return VS1003B_STATUS_OK;
+}
+
+vs1003b_status_t vs1003b_sine_test_start(void)
+{
+    uint16_t mode = 0U;
+    vs1003b_status_t status = vs1003b_read_register(
+        VS1003B_SCI_MODE_ADDRESS,
+        &mode
+    );
+
+    if (status != VS1003B_STATUS_OK)
+    {
+        return status;
+    }
+
+    status = vs1003b_write_register(
+        VS1003B_SCI_MODE_ADDRESS,
+        mode | VS1003B_SM_TESTS
+    );
+
+    if (status != VS1003B_STATUS_OK)
+    {
+        return status;
+    }
+
+    return vs1003b_send_sdi(
+        vs1003b_sine_start_command,
+        sizeof(vs1003b_sine_start_command)
+    );
+}
+
+vs1003b_status_t vs1003b_sine_test_stop(void)
+{
+    return vs1003b_send_sdi(
+        vs1003b_sine_stop_command,
+        sizeof(vs1003b_sine_stop_command)
+    );
 }
 
 vs1003b_status_t vs1003b_init(SPI_HandleTypeDef *hspi, uint16_t *mode_value)
