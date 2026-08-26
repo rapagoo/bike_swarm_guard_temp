@@ -42,11 +42,13 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined library search paths
 )
 
-# Add sources to executable
+# MyApp 아래의 모든 C 소스를 자동 검색
+file(GLOB_RECURSE MYAPP_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/MyApp/*.c"
+)
+
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
-    # Add user sources here
-    MyApp/ap/app.c
-    MyApp/hw/button.c
+    ${MYAPP_SOURCES}
 )
 
 # Add include paths
