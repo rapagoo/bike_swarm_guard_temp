@@ -90,7 +90,7 @@ int main(void)
   MX_GPIO_Init();
   MX_SPI2_Init();
   /* USER CODE BEGIN 2 */
-  app_init();
+  app_init(&hspi2);
   /* USER CODE END 2 */
 
   /* Infinite loop */
