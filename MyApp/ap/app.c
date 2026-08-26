@@ -20,6 +20,9 @@ void app_process(void)
         last_message = message;
         alert_show(message);
     }
+
+    /* 논블로킹 LED/부저 패턴의 시간 진행을 계속 처리합니다. */
+    alert_update();
 }
 
 message_type_t app_get_last_message(void)
