@@ -57,6 +57,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     MyApp/ap
     MyApp/common
     MyApp/hw
+    MyApp/service
 )
 
 # Add project symbols (macros)
