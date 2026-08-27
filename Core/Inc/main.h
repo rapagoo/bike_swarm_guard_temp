@@ -77,6 +77,8 @@ void Error_Handler(void);
 #define BTN4_GPIO_Port GPIOC
 #define BTN3_Pin GPIO_PIN_8
 #define BTN3_GPIO_Port GPIOA
+#define BUZZER_Pin GPIO_PIN_4
+#define BUZZER_GPIO_Port GPIOB
 #define BTN1_Pin GPIO_PIN_5
 #define BTN1_GPIO_Port GPIOB
 

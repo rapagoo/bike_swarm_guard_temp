@@ -19,9 +19,9 @@ typedef struct
 } button_state_t;
 
 static button_state_t buttons[] = {
-    {BTN1_GPIO_Port, BTN1_Pin, MSG_WATER_REQUEST, false, false, 0U},
-    {BTN2_GPIO_Port, BTN2_Pin, MSG_FOOD_REQUEST, false, false, 0U}, 
-    {BTN3_GPIO_Port, BTN3_Pin, MSG_CAUTION_REQUEST, false, false, 0U},
+    {BTN1_GPIO_Port, BTN1_Pin, MSG_SPEED_DOWN_REQUEST, false, false, 0U},
+    {BTN2_GPIO_Port, BTN2_Pin, MSG_SPEED_UP_REQUEST, false, false, 0U},
+    {BTN3_GPIO_Port, BTN3_Pin, MSG_SAFETY_REMINDER, false, false, 0U},
     {BTN4_GPIO_Port, BTN4_Pin, MSG_STOP_REQUEST, false, false, 0U},
 };
 
