@@ -1,7 +1,9 @@
 #include "app.h"
 
 #include "button.h"
+#include "message_router.h"
 #include "message_service.h"
+#include "safety_service.h"
 #include "uart_service.h"
 #include "vs1003b.h"
 
@@ -31,10 +33,22 @@ volatile uint32_t uart_debug_dropped_count = 0U;
 volatile message_type_t uart_debug_last_received = MSG_NONE;
 volatile message_type_t message_debug_inject = MSG_NONE;
 volatile uint32_t message_debug_inject_count = 0U;
+volatile uint32_t message_router_debug_local_count = 0U;
+volatile uint32_t message_router_debug_remote_count = 0U;
+volatile bool safety_debug_mpu_ready = false;
+volatile bool safety_debug_mpu_data_valid = false;
+volatile uint8_t safety_debug_mpu_address = 0U;
+volatile uint32_t safety_debug_mpu_failure_count = 0U;
+volatile bool safety_debug_distance_valid = false;
+volatile float safety_debug_distance_cm = 0.0f;
+volatile safety_event_t safety_debug_event = SAFETY_EVENT_NONE;
+volatile fall_state_t safety_debug_fall_state = FALL_STATE_IDLE;
+volatile uint32_t safety_debug_countdown_seconds = 0U;
 
 void app_init(
     SPI_HandleTypeDef *vs1003b_spi,
-    UART_HandleTypeDef *message_uart
+    UART_HandleTypeDef *message_uart,
+    I2C_HandleTypeDef *sensor_i2c
 )
 {
     button_init();
@@ -93,6 +107,8 @@ void app_init(
     }
 
     message_service_init(vs1003b_debug_status);
+    message_router_init();
+    safety_service_init(sensor_i2c);
 }
 
 void app_process(void)
@@ -102,8 +118,7 @@ void app_process(void)
     if (message != MSG_NONE)
     {
         last_message = message;
-        message_service_handle(message);
-        uart_debug_status = uart_service_send_message(message);
+        uart_debug_status = message_router_publish_local(message);
     }
 
     message_type_t received_message = MSG_NONE;
@@ -111,7 +126,7 @@ void app_process(void)
     {
         uart_debug_last_received = received_message;
         last_message = received_message;
-        message_service_handle(received_message);
+        message_router_deliver_remote(received_message);
     }
 
     /* 팀 장치 연결 전 외부 메시지 동작을 확인하기 위한 디버거 주입 지점입니다. */
@@ -121,9 +136,10 @@ void app_process(void)
         message_debug_inject = MSG_NONE;
         ++message_debug_inject_count;
         last_message = injected_message;
-        message_service_handle(injected_message);
+        message_router_deliver_remote(injected_message);
     }
 
+    safety_service_process();
     message_service_process();
 
     const message_service_status_t *status = message_service_get_status();
@@ -140,6 +156,19 @@ void app_process(void)
     uart_debug_rx_count = uart_service_get_rx_count();
     uart_debug_invalid_count = uart_service_get_invalid_count();
     uart_debug_dropped_count = uart_service_get_dropped_count();
+    message_router_debug_local_count = message_router_get_local_count();
+    message_router_debug_remote_count = message_router_get_remote_count();
+
+    const safety_service_status_t *safety_status = safety_service_get_status();
+    safety_debug_mpu_ready = safety_status->mpu_ready;
+    safety_debug_mpu_data_valid = safety_status->mpu_data_valid;
+    safety_debug_mpu_address = safety_status->mpu_address;
+    safety_debug_mpu_failure_count = safety_status->mpu_failure_count;
+    safety_debug_distance_valid = safety_status->distance_valid;
+    safety_debug_distance_cm = safety_status->distance_cm;
+    safety_debug_event = safety_status->event;
+    safety_debug_fall_state = safety_status->fall_state;
+    safety_debug_countdown_seconds = safety_status->countdown_remaining_seconds;
 }
 
 message_type_t app_get_last_message(void)

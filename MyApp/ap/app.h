@@ -6,7 +6,8 @@
 
 void app_init(
     SPI_HandleTypeDef *vs1003b_spi,
-    UART_HandleTypeDef *message_uart
+    UART_HandleTypeDef *message_uart,
+    I2C_HandleTypeDef *sensor_i2c
 );
 void app_process(void);
 
