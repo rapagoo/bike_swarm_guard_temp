@@ -1,9 +1,7 @@
 #include "app.h"
 
-#include "alert.h"
-#include "audio_service.h"
-#include "buzzer.h"
 #include "button.h"
+#include "message_service.h"
 #include "vs1003b.h"
 
 #define VS1003B_SCI_CLOCKF_ADDRESS 0x03U
@@ -25,8 +23,6 @@ volatile bool buzzer_debug_active = false;
 void app_init(SPI_HandleTypeDef *vs1003b_spi)
 {
     button_init();
-    alert_init();
-    buzzer_init();
 
     uint16_t mode = 0U;
     vs1003b_debug_status = vs1003b_init(vs1003b_spi, &mode);
@@ -79,6 +75,8 @@ void app_init(SPI_HandleTypeDef *vs1003b_spi)
             vs1003b_debug_status = VS1003B_STATUS_REGISTER_MISMATCH;
         }
     }
+
+    message_service_init(vs1003b_debug_status);
 }
 
 void app_process(void)
@@ -88,29 +86,16 @@ void app_process(void)
     if (message != MSG_NONE)
     {
         last_message = message;
-        alert_show(message);
-
-        if (message == MSG_SAFETY_REMINDER)
-        {
-            buzzer_beep(150U);
-        }
-
-        if (vs1003b_debug_status == VS1003B_STATUS_OK)
-        {
-            vs1003b_debug_status = audio_service_play(message);
-        }
+        message_service_handle(message);
     }
 
-    if (vs1003b_debug_status == VS1003B_STATUS_OK)
-    {
-        vs1003b_debug_status = audio_service_process();
-    }
+    message_service_process();
 
-    vs1003b_debug_audio_playing = audio_service_is_playing();
-    vs1003b_debug_audio_position = audio_service_position();
-
-    buzzer_process();
-    buzzer_debug_active = buzzer_is_active();
+    const message_service_status_t *status = message_service_get_status();
+    vs1003b_debug_status = status->audio_status;
+    vs1003b_debug_audio_playing = status->audio_playing;
+    vs1003b_debug_audio_position = status->audio_position;
+    buzzer_debug_active = status->buzzer_active;
 }
 
 message_type_t app_get_last_message(void)
