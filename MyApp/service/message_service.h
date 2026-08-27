@@ -1,6 +1,8 @@
 #ifndef MESSAGE_SERVICE_H
 #define MESSAGE_SERVICE_H
 
+#include "alert.h"
+#include "buzzer.h"
 #include "message_type.h"
 #include "vs1003b.h"
 
@@ -13,6 +15,9 @@ typedef struct
     bool audio_playing;
     uint32_t audio_position;
     bool buzzer_active;
+    buzzer_pattern_t buzzer_pattern;
+    alert_state_t alert_state;
+    bool alert_led_on;
 } message_service_status_t;
 
 /* 출력 장치를 초기화하고 VS1003B의 초기 상태를 전달받습니다. */

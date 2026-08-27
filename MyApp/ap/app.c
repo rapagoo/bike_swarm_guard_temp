@@ -20,12 +20,17 @@ volatile uint16_t vs1003b_debug_volume = 0U;
 volatile bool vs1003b_debug_audio_playing = false;
 volatile uint32_t vs1003b_debug_audio_position = 0U;
 volatile bool buzzer_debug_active = false;
+volatile buzzer_pattern_t buzzer_debug_pattern = BUZZER_PATTERN_NONE;
+volatile alert_state_t alert_debug_state = ALERT_STATE_OFF;
+volatile bool alert_debug_led_on = false;
 volatile HAL_StatusTypeDef uart_debug_status = HAL_ERROR;
 volatile uint32_t uart_debug_tx_count = 0U;
 volatile uint32_t uart_debug_rx_count = 0U;
 volatile uint32_t uart_debug_invalid_count = 0U;
 volatile uint32_t uart_debug_dropped_count = 0U;
 volatile message_type_t uart_debug_last_received = MSG_NONE;
+volatile message_type_t message_debug_inject = MSG_NONE;
+volatile uint32_t message_debug_inject_count = 0U;
 
 void app_init(
     SPI_HandleTypeDef *vs1003b_spi,
@@ -109,6 +114,16 @@ void app_process(void)
         message_service_handle(received_message);
     }
 
+    /* 팀 장치 연결 전 외부 메시지 동작을 확인하기 위한 디버거 주입 지점입니다. */
+    message_type_t injected_message = message_debug_inject;
+    if (injected_message != MSG_NONE)
+    {
+        message_debug_inject = MSG_NONE;
+        ++message_debug_inject_count;
+        last_message = injected_message;
+        message_service_handle(injected_message);
+    }
+
     message_service_process();
 
     const message_service_status_t *status = message_service_get_status();
@@ -116,6 +131,9 @@ void app_process(void)
     vs1003b_debug_audio_playing = status->audio_playing;
     vs1003b_debug_audio_position = status->audio_position;
     buzzer_debug_active = status->buzzer_active;
+    buzzer_debug_pattern = status->buzzer_pattern;
+    alert_debug_state = status->alert_state;
+    alert_debug_led_on = status->alert_led_on;
 
     uart_debug_status = uart_service_get_status();
     uart_debug_tx_count = uart_service_get_tx_count();
