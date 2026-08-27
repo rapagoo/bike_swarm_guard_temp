@@ -14,8 +14,16 @@
 #define VS1003B_RESET_LOW_MS 2U
 #define VS1003B_DREQ_TIMEOUT_MS 100U
 #define VS1003B_SPI_TIMEOUT_MS 10U
+#define VS1003B_SDI_CHUNK_SIZE 32U
+#define VS1003B_END_FILL_SIZE 32U
 
 static SPI_HandleTypeDef *vs1003b_spi = NULL;
+
+static const uint8_t *play_data = NULL;
+static uint32_t play_size = 0U;
+static uint32_t play_position = 0U;
+static bool play_finishing = false;
+static bool play_active = false;
 
 static const uint8_t vs1003b_sine_start_command[8] = {
     0x53U, 0xEFU, 0x6EU, 0x03U, 0x00U, 0x00U, 0x00U, 0x00U,
@@ -148,7 +156,7 @@ vs1003b_status_t vs1003b_write_register(uint8_t address, uint16_t value)
 
 static vs1003b_status_t vs1003b_send_sdi(const uint8_t *data, uint16_t size)
 {
-    uint8_t rx_data[sizeof(vs1003b_sine_start_command)] = {0U};
+    uint8_t rx_data[VS1003B_SDI_CHUNK_SIZE] = {0U};
 
     if ((vs1003b_spi == NULL) || (data == NULL) ||
         (size == 0U) || (size > sizeof(rx_data)))
@@ -180,6 +188,82 @@ static vs1003b_status_t vs1003b_send_sdi(const uint8_t *data, uint16_t size)
     }
 
     return VS1003B_STATUS_OK;
+}
+
+vs1003b_status_t vs1003b_play_start(const uint8_t *data, uint32_t size)
+{
+    if ((data == NULL) || (size == 0U))
+    {
+        return VS1003B_STATUS_INVALID_ARGUMENT;
+    }
+
+    if (play_active)
+    {
+        return VS1003B_STATUS_BUSY;
+    }
+
+    play_data = data;
+    play_size = size;
+    play_position = 0U;
+    play_finishing = false;
+    play_active = true;
+
+    return VS1003B_STATUS_OK;
+}
+
+vs1003b_status_t vs1003b_play_process(void)
+{
+    static const uint8_t end_fill[VS1003B_END_FILL_SIZE] = {0U};
+
+    if (!play_active || !vs1003b_is_ready())
+    {
+        return VS1003B_STATUS_OK;
+    }
+
+    if (play_finishing)
+    {
+        vs1003b_status_t status = vs1003b_send_sdi(end_fill, sizeof(end_fill));
+        if (status == VS1003B_STATUS_OK)
+        {
+            play_active = false;
+            play_finishing = false;
+        }
+        return status;
+    }
+
+    uint32_t remaining = play_size - play_position;
+    uint16_t chunk_size = (remaining > VS1003B_SDI_CHUNK_SIZE)
+        ? VS1003B_SDI_CHUNK_SIZE
+        : (uint16_t)remaining;
+
+    vs1003b_status_t status = vs1003b_send_sdi(
+        &play_data[play_position],
+        chunk_size
+    );
+
+    if (status != VS1003B_STATUS_OK)
+    {
+        play_active = false;
+        return status;
+    }
+
+    play_position += chunk_size;
+    if (play_position >= play_size)
+    {
+        play_finishing = true;
+    }
+
+    return VS1003B_STATUS_OK;
+}
+
+bool vs1003b_is_playing(void)
+{
+    return play_active;
+}
+
+uint32_t vs1003b_play_position(void)
+{
+    return play_position;
 }
 
 vs1003b_status_t vs1003b_sine_test_start(void)
