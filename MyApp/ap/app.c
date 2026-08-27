@@ -2,6 +2,7 @@
 
 #include "button.h"
 #include "message_service.h"
+#include "uart_service.h"
 #include "vs1003b.h"
 
 #define VS1003B_SCI_CLOCKF_ADDRESS 0x03U
@@ -19,10 +20,20 @@ volatile uint16_t vs1003b_debug_volume = 0U;
 volatile bool vs1003b_debug_audio_playing = false;
 volatile uint32_t vs1003b_debug_audio_position = 0U;
 volatile bool buzzer_debug_active = false;
+volatile HAL_StatusTypeDef uart_debug_status = HAL_ERROR;
+volatile uint32_t uart_debug_tx_count = 0U;
+volatile uint32_t uart_debug_rx_count = 0U;
+volatile uint32_t uart_debug_invalid_count = 0U;
+volatile uint32_t uart_debug_dropped_count = 0U;
+volatile message_type_t uart_debug_last_received = MSG_NONE;
 
-void app_init(SPI_HandleTypeDef *vs1003b_spi)
+void app_init(
+    SPI_HandleTypeDef *vs1003b_spi,
+    UART_HandleTypeDef *message_uart
+)
 {
     button_init();
+    uart_debug_status = uart_service_init(message_uart);
 
     uint16_t mode = 0U;
     vs1003b_debug_status = vs1003b_init(vs1003b_spi, &mode);
@@ -87,6 +98,15 @@ void app_process(void)
     {
         last_message = message;
         message_service_handle(message);
+        uart_debug_status = uart_service_send_message(message);
+    }
+
+    message_type_t received_message = MSG_NONE;
+    if (uart_service_get_message(&received_message))
+    {
+        uart_debug_last_received = received_message;
+        last_message = received_message;
+        message_service_handle(received_message);
     }
 
     message_service_process();
@@ -96,6 +116,12 @@ void app_process(void)
     vs1003b_debug_audio_playing = status->audio_playing;
     vs1003b_debug_audio_position = status->audio_position;
     buzzer_debug_active = status->buzzer_active;
+
+    uart_debug_status = uart_service_get_status();
+    uart_debug_tx_count = uart_service_get_tx_count();
+    uart_debug_rx_count = uart_service_get_rx_count();
+    uart_debug_invalid_count = uart_service_get_invalid_count();
+    uart_debug_dropped_count = uart_service_get_dropped_count();
 }
 
 message_type_t app_get_last_message(void)
